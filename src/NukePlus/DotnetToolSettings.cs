@@ -1,5 +1,9 @@
-﻿namespace NukePlus;
+﻿using System.Diagnostics.CodeAnalysis;
+using JetBrains.Annotations;
 
-public sealed class DotnetToolSettings : ToolSettings
-{
-}
+namespace NukePlus;
+
+[PublicAPI]
+[ExcludeFromCodeCoverage]
+[Serializable]
+public class DotnetToolSettings : ToolSettings;
