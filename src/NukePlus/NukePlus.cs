@@ -96,4 +96,30 @@ public static class NukePlus
                     Log.Warning("Tool Update: {Message}", e.Message);
                 }
             });
+
+    public static async Task RunCommandUntil(
+        string command,
+        IEnumerable<string> args,
+        Func<OutputType, string, bool> pred,
+        TimeSpan? timeout = null)
+    {
+        TaskCompletionSource tcs = new();
+        var process = ProcessTasks.StartProcess(
+            command,
+            string.Join(" ", args.Select(a => a.DoubleQuoteIfNeeded())),
+            NukeBuild.RootDirectory,
+            logger: (t, msg) =>
+            {
+                if (t == OutputType.Err)
+                    Log.Error("{Msg}", msg);
+                else
+                    Log.Information("{Msg}", msg);
+
+                if (tcs.Task.IsCompleted || !pred(t, msg)) return;
+                tcs.SetResult();
+            });
+
+        await tcs.Task.WaitAsync(timeout ?? TimeSpan.FromMinutes(1));
+        if (process.HasExited) process.AssertZeroExitCode();
+    }
 }

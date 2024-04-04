@@ -1,4 +1,4 @@
-﻿using Nuke.Common.Tools.DocFX;
+using Nuke.Common.Tools.DocFX;
 using static NukePlus.NukePlus;
 
 namespace NukePlus;
