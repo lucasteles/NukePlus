@@ -68,10 +68,11 @@ public static class NukePlus
             return process.Output;
         };
 
-    public static DotnetTool<DotNetBuildSettings> DotnetLocalTool(
-        string localTool, Configure<Arguments>? args = null,
-        Configure<DotNetBuildSettings>? preConfig = null
-    ) => DotnetLocalTool<DotNetBuildSettings>(localTool, args, preConfig);
+    public static DotnetTool<DotnetToolSettings> DotnetLocalTool(
+        string localTool,
+        Configure<Arguments>? args = null,
+        Configure<DotnetToolSettings>? preConfig = null
+    ) => DotnetLocalTool<DotnetToolSettings>(localTool, args, preConfig);
 
     public static void UpdateLocalTools() =>
         DotNet($"tool list", logOutput: false)
