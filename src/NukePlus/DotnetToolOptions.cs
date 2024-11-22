@@ -1,4 +1,4 @@
-﻿using System.Diagnostics.CodeAnalysis;
+using System.Diagnostics.CodeAnalysis;
 using JetBrains.Annotations;
 
 namespace NukePlus;
@@ -6,4 +6,4 @@ namespace NukePlus;
 [PublicAPI]
 [ExcludeFromCodeCoverage]
 [Serializable]
-public class DotnetToolSettings : ToolSettings;
+public class DotnetToolOptions : ToolOptions;

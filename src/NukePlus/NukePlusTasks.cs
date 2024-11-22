@@ -2,9 +2,9 @@ namespace NukePlus;
 
 public delegate IReadOnlyCollection<Output> DotnetTool<TSettings>(
     Configure<TSettings>? configure = null
-) where TSettings : ToolSettings;
+) where TSettings : ToolOptions;
 
-public static class NukePlus
+public static class NukePlusTasks
 {
     public static Tool BrowserTool => GetTool(
         Platform switch
@@ -45,34 +45,32 @@ public static class NukePlus
     }
 
     public static DotnetTool<TSettings> DotnetLocalTool<TSettings>(
-        string localTool,
-        Configure<Arguments>? args = null,
-        Configure<TSettings>? preConfig = null
-    ) where TSettings : ToolSettings, new() =>
+        string localTool, string[] args, Configure<TSettings>? preConfig) where TSettings : ToolOptions, new() =>
         (Configure<TSettings>? configure = null) =>
         {
-            var toolSettings = new TSettings()
-                .SetProcessWorkingDirectory(NukeBuild.RootDirectory)
-                .SetProcessToolPath(DotNetPath)
-                .SetProcessArgumentConfigurator(procArgs => new Arguments()
-                    .Add(localTool).Concatenate(procArgs)
-                    .Concatenate(args?.Invoke(new()) ?? new Arguments()));
+            var options = new TSettings().UseDotnetLocalTool(localTool, args);
+            preConfig?.Invoke(options);
+            configure?.Invoke(options);
 
-            if (preConfig is not null) toolSettings = preConfig(toolSettings);
-            if (configure is not null) toolSettings = configure(toolSettings);
-
-            using var process = ProcessTasks.StartProcess(toolSettings);
-            (toolSettings.ProcessExitHandler ?? ((_, p) => DotNetExitHandler.Invoke(null, p)))
-                .Invoke(toolSettings, process.AssertWaitForExit());
-
-            return process.Output;
+            Log.Warning(options.ProcessAdditionalArguments.ToJson());
+            return new CustomDotNetTasks().RunOptions(options);
         };
 
-    public static DotnetTool<DotnetToolSettings> DotnetLocalTool(
-        string localTool,
-        Configure<Arguments>? args = null,
-        Configure<DotnetToolSettings>? preConfig = null
-    ) => DotnetLocalTool<DotnetToolSettings>(localTool, args, preConfig);
+    public static DotnetTool<DotnetToolOptions> DotnetLocalTool(
+        string localTool, string[] args, Configure<DotnetToolOptions>? preConfig) =>
+        DotnetLocalTool<DotnetToolOptions>(localTool, args, preConfig);
+
+    public static DotnetTool<TSettings> DotnetLocalTool<TSettings>(string localTool, params string[] args)
+        where TSettings : ToolOptions, new() =>
+        DotnetLocalTool<TSettings>(localTool, args, null);
+
+    public static DotnetTool<DotnetToolOptions> DotnetLocalTool(string localTool, params string[] args) =>
+        DotnetLocalTool(localTool, args, null);
+
+    class CustomDotNetTasks : DotNetTasks
+    {
+        public IReadOnlyCollection<Output> RunOptions(ToolOptions options) => this.Run(options);
+    }
 
     public static void UpdateLocalTools() =>
         DotNet($"tool list", logOutput: false)

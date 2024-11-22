@@ -16,4 +16,4 @@ global using Nuke.Common.Utilities.Collections;
 global using Serilog;
 global using static Nuke.Common.EnvironmentInfo;
 global using static Nuke.Common.Tools.DotNet.DotNetTasks;
-global using DotnetTool = NukePlus.DotnetTool<NukePlus.DotnetToolSettings>;
+global using DotnetTool = NukePlus.DotnetTool<NukePlus.DotnetToolOptions>;

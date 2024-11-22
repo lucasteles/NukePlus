@@ -3,13 +3,13 @@ using JetBrains.Annotations;
 
 namespace NukePlus;
 
-[TypeConverter(typeof(TypeConverter<Configuration>))]
-public class Configuration : Enumeration
+[TypeConverter(typeof(TypeConverter<DotNetConfiguration>))]
+public class DotNetConfiguration : Enumeration
 {
-    public Configuration(string name) => Value = name;
-    public static readonly Configuration Debug = new(nameof(Debug));
-    public static readonly Configuration Release = new(nameof(Release));
-    public static implicit operator string(Configuration configuration) => configuration.Value;
+    public DotNetConfiguration(string name) => Value = name;
+    public static readonly DotNetConfiguration Debug = new(nameof(Debug));
+    public static readonly DotNetConfiguration Release = new(nameof(Release));
+    public static implicit operator string(DotNetConfiguration configuration) => configuration.Value;
 }
 
 public record Sdk(string Version, string RollForward);

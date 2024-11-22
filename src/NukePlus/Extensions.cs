@@ -4,18 +4,34 @@
 
 public static class Extensions
 {
-    public static T UseDotnetLocalTool<T>(this T tool, Solution solution,
-        string localTool, Func<Arguments, Arguments> args)
-        where T : ToolSettings => UseDotnetLocalTool(tool, solution, localTool, args(new()));
+    public static T UseDotnetLocalTool<T>(this T tool,
+        string localTool = "", params string[] arguments)
+        where T : ToolOptions =>
+        UseDotnetLocalTool(tool, null, localTool, arguments);
 
-    public static T UseDotnetLocalTool<T>(this T tool, Solution solution,
-        string localTool = "", Arguments? arguments = null)
-        where T : ToolSettings => tool
-        .SetProcessWorkingDirectory(solution.Directory)
-        .SetProcessToolPath(DotNetPath)
-        .SetProcessArgumentConfigurator(
-            args => new Arguments().Add(localTool).Concatenate(args)
-                .Concatenate(arguments ?? new()));
+    public static T UseDotnetLocalTool<T>(
+        this T tool,
+        Solution? solution,
+        string localTool = "",
+        params string[] arguments
+    ) where T : ToolOptions =>
+        tool
+            .SetProcessWorkingDirectory(solution?.Directory ?? NukeBuild.RootDirectory)
+            .SetProcessToolPath(DotNetPath)
+            .Modify(baseOptions =>
+            {
+                if (baseOptions is not T options)
+                    throw new InvalidOperationException($"Invalid option type: ${baseOptions.GetType().Name}");
+
+                string[] args =
+                [
+                    localTool,
+                    .. options.ProcessAdditionalArguments ?? [],
+                    .. arguments
+                ];
+
+                baseOptions.Set(() => options.ProcessAdditionalArguments, args);
+            });
 
     public static Project? FindProject(this Solution sln, string name) =>
         sln.AllProjects.SingleOrDefault(
