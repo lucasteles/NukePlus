@@ -11,27 +11,30 @@ public static class Extensions
 
     public static T UseDotnetLocalTool<T>(
         this T tool,
-        Solution? solution,
+        AbsolutePath? path,
         string localTool = "",
         params string[] arguments
     ) where T : ToolOptions =>
         tool
-            .SetProcessWorkingDirectory(solution?.Directory ?? NukeBuild.RootDirectory)
+            .SetProcessWorkingDirectory(path ?? NukeBuild.RootDirectory)
             .SetProcessToolPath(DotNetPath)
-            .Modify(baseOptions =>
-            {
-                if (baseOptions is not T options)
-                    throw new InvalidOperationException($"Invalid option type: ${baseOptions.GetType().Name}");
+            .SetProcessAdditionalArguments(arguments)
+            .SetProcessFirstArguments(localTool);
 
-                string[] args =
-                [
-                    localTool,
-                    .. options.ProcessAdditionalArguments ?? [],
-                    .. arguments
-                ];
+    public static T SetProcessFirstArguments<T>(this T @this, params string[] preArgs) where T : ToolOptions => @this
+        .Modify(baseOptions =>
+        {
+            if (baseOptions is not T options)
+                throw new InvalidOperationException($"Invalid option type: ${baseOptions.GetType().Name}");
 
-                baseOptions.Set(() => options.ProcessAdditionalArguments, args);
-            });
+            string[] newArgs =
+            [
+                ..preArgs,
+                .. options.ProcessAdditionalArguments ?? [],
+            ];
+
+            baseOptions.Set(() => options.ProcessAdditionalArguments, newArgs);
+        });
 
     public static Project? FindProject(this Solution sln, string name) =>
         sln.AllProjects.SingleOrDefault(

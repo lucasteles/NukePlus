@@ -1,5 +1,8 @@
-namespace NukePlus;
+using System.Reflection;
+using System.Reflection.Emit;
+using Newtonsoft.Json;
 
+namespace NukePlus;
 
 public delegate IReadOnlyCollection<Output> DotnetTool<TSettings>(
     Configure<TSettings>? configure = null
@@ -49,10 +52,22 @@ public static class NukePlusTasks
         string localTool, string[] args, Configure<TSettings>? preConfig) where TSettings : ToolOptions, new() =>
         (Configure<TSettings>? configure = null) =>
         {
-            var options = new TSettings().UseDotnetLocalTool(localTool, args);
-            options = preConfig?.Invoke(options) ?? options;
-            options = configure?.Invoke(options) ?? options;
-            return new CustomDotNetTasks().RunOptions(options);
+            var options = new TSettings()
+                .SetProcessToolPath(DotNetPath)
+                .SetProcessAdditionalArguments(args);
+
+            if (preConfig is not null)
+                options = preConfig.Invoke(options);
+
+            if (configure is not null)
+                options = configure.Invoke(options);
+
+            var copy = (TSettings)JsonConvert.DeserializeObject(
+                JsonConvert.SerializeObject(options),
+                CreateSettingsTypeWithCommand<TSettings>(localTool)
+            )!;
+
+            return new CustomDotNetTasks().RunOptions(copy);
         };
 
     public static DotnetTool<DotnetToolOptions> DotnetLocalTool(
@@ -119,5 +134,41 @@ public static class NukePlusTasks
 
         await tcs.Task.WaitAsync(timeout ?? TimeSpan.FromMinutes(1));
         if (process.HasExited) process.AssertZeroExitCode();
+    }
+
+    static Type CreateSettingsTypeWithCommand<TSettings>(params string[] args)
+        => CreateSettingsTypeWithCommand<TSettings>(new CommandAttribute
+        {
+            Arguments = args.JoinSpace(), Command = null, Type = null
+        });
+
+    static Type CreateSettingsTypeWithCommand<TSettings>(CommandAttribute baseAttr)
+    {
+        var attrType = typeof(CommandAttribute);
+        var attrCtor = attrType.GetConstructor(Type.EmptyTypes)!;
+        var properties = attrType.GetProperties(BindingFlags.Public | BindingFlags.Instance)
+            .Where(p => p.CanWrite).ToArray();
+
+        var propertyValues = properties.Select(p => p.GetValue(baseAttr, null)).ToArray();
+        var fields = attrType.GetFields(BindingFlags.Public | BindingFlags.Instance);
+        var fieldsValues = fields.Select(p => p.GetValue(baseAttr)).ToArray();
+
+        CustomAttributeBuilder attrBuilder = new(
+            attrCtor,
+            [],
+            properties,
+            propertyValues,
+            fields,
+            fieldsValues
+        );
+
+        var type = typeof(TSettings);
+        var aName = new AssemblyName("NukePlus");
+        var tb = AssemblyBuilder.DefineDynamicAssembly(aName, AssemblyBuilderAccess.Run)
+            .DefineDynamicModule(aName.Name!)
+            .DefineType(type.Name + "Proxy", TypeAttributes.Public, type);
+        tb.SetCustomAttribute(attrBuilder);
+
+        return tb.CreateType();
     }
 }
