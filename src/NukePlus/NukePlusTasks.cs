@@ -1,5 +1,6 @@
 namespace NukePlus;
 
+
 public delegate IReadOnlyCollection<Output> DotnetTool<TSettings>(
     Configure<TSettings>? configure = null
 ) where TSettings : ToolOptions;
@@ -49,10 +50,8 @@ public static class NukePlusTasks
         (Configure<TSettings>? configure = null) =>
         {
             var options = new TSettings().UseDotnetLocalTool(localTool, args);
-            preConfig?.Invoke(options);
-            configure?.Invoke(options);
-
-            Log.Warning(options.ProcessAdditionalArguments.ToJson());
+            options = preConfig?.Invoke(options) ?? options;
+            options = configure?.Invoke(options) ?? options;
             return new CustomDotNetTasks().RunOptions(options);
         };
 
