@@ -83,7 +83,8 @@ public static class NukePlusTasks
 
     class CustomDotNetTasks : DotNetTasks
     {
-        public IReadOnlyCollection<Output> RunOptions(ToolOptions options) => this.Run(options);
+        public IReadOnlyCollection<Output> RunOptions<T>(T options) where T : ToolOptions, new() =>
+            this.Run<T>(options);
     }
 
     public static void UpdateLocalTools() =>
