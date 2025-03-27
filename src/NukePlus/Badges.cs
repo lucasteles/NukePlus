@@ -1,4 +1,5 @@
 using System.Collections.Frozen;
+using System.Globalization;
 using System.Text.RegularExpressions;
 using System.Xml.Linq;
 using System.Xml.XPath;
@@ -43,13 +44,27 @@ public static class Badges
 
     public static void ForLineCount(AbsolutePath output, LocParams locParams)
     {
-        var result = CountLinesOfCode(locParams);
+        var (fileCount, lineCount) = CountLinesOfCode(locParams);
 
-        DownloadShieldsIo(output / "lines_of_code.svg", "Lines of Code",
-            result.LineCount.ToString(), "blue");
+        var lineCountText = lineCount.ToString("N0", CultureInfo.InvariantCulture);
+        var fileCountText = fileCount.ToString("N0", CultureInfo.InvariantCulture);
 
-        DownloadShieldsIo(output / "number_of_files.svg", "Code Files",
-            result.FileCount.ToString(), "blue");
+        Log.Information("Code File Count: {FileCountText}", fileCountText);
+        Log.Information("Lines of Code: {LineCountText}", lineCount);
+
+        DownloadShieldsIo(
+            output / "lines_of_code.svg",
+            "Lines of Code",
+            lineCountText,
+            "blue"
+        );
+
+        DownloadShieldsIo(
+            output / "number_of_files.svg",
+            "Code Files",
+            fileCountText,
+            "blue"
+        );
     }
 
     public static void DownloadShieldsIo(AbsolutePath fileName,
@@ -80,39 +95,44 @@ public static class Badges
 
     [Serializable]
     public sealed record LocParams(
-        AbsolutePath RootPath,
         string InclusionGlob,
+        AbsolutePath? RootPath = null,
         string? ExclusionGlob = null,
         string? ExcludeDirs = null,
-        bool IgnoreBlankLines = true,
-        string? IgnoreLinePattern = null
+        string? IgnoreLinePattern = null,
+        bool IgnoreBlankLines = true
     );
 
-    static (int FileCount, int LineCount) CountLinesOfCode(LocParams p)
+    static (int fileCount, int lineCount) CountLinesOfCode(LocParams p)
     {
+        var rootPath = (p.RootPath ?? NukeBuild.RootDirectory);
+
+        if (!string.IsNullOrWhiteSpace(rootPath.Extension))
+            rootPath = rootPath.Parent ?? throw new InvalidOperationException($"Invalid directory path: {p.RootPath}");
+
         var ignoreDirs =
-            p.RootPath.GlobDirectories(ParseGlobs(p.ExcludeDirs)).ToFrozenSet();
+            rootPath.GlobDirectories(ParseGlobs(p.ExcludeDirs)).ToFrozenSet();
 
         var files =
-            p.RootPath
+            rootPath
                 .GlobFiles(ParseGlobs(p.InclusionGlob))
-                .Except(p.RootPath.GlobFiles(ParseGlobs(p.ExclusionGlob)))
-                .Where(p => ignoreDirs.All(d => !d.Contains(p)))
+                .Except(rootPath.GlobFiles(ParseGlobs(p.ExclusionGlob)))
+                .Where(path => ignoreDirs.All(dir => !dir.Contains(path)))
                 .ToArray();
 
         var totalLines =
             files
-                .SelectMany(f => f.ReadAllLines())
-                .Select(l => l.Trim())
-                .Count(l =>
+                .SelectMany(file => file.ReadAllLines())
+                .Select(line => line.Trim())
+                .Count(line =>
                 {
-                    if (p.IgnoreBlankLines && string.IsNullOrWhiteSpace(l))
+                    if (p.IgnoreBlankLines && string.IsNullOrWhiteSpace(line))
                         return false;
 
                     if (string.IsNullOrWhiteSpace(p.IgnoreLinePattern))
                         return true;
 
-                    return !Regex.IsMatch(l, p.IgnoreLinePattern, RegexOptions.IgnoreCase);
+                    return !Regex.IsMatch(line, p.IgnoreLinePattern, RegexOptions.IgnoreCase);
                 });
 
         return (files.Length, totalLines);
