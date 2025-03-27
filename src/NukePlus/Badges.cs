@@ -1,3 +1,5 @@
+using System.Collections.Frozen;
+using System.Text.RegularExpressions;
 using System.Xml.Linq;
 using System.Xml.XPath;
 
@@ -39,6 +41,17 @@ public static class Badges
         DownloadShieldsIo(output / "test_report_badge.svg", "tests", message, color);
     }
 
+    public static void ForLineCount(AbsolutePath output, LocParams locParams)
+    {
+        var result = CountLinesOfCode(locParams);
+
+        DownloadShieldsIo(output / "lines_of_code.svg", "Lines of Code",
+            result.LineCount.ToString(), "blue");
+
+        DownloadShieldsIo(output / "number_of_files.svg", "Code Files",
+            result.FileCount.ToString(), "blue");
+    }
+
     public static void DownloadShieldsIo(AbsolutePath fileName,
         string label, string message, string color)
     {
@@ -62,7 +75,60 @@ public static class Badges
         int Value(string name) =>
             counters is not null && int.TryParse(counters.Attribute(name)?.Value, out var n)
                 ? n
-                : default;
+                : 0;
+    }
+
+    [Serializable]
+    public sealed record LocParams(
+        AbsolutePath RootPath,
+        string InclusionGlob,
+        string? ExclusionGlob = null,
+        string? ExcludeDirs = null,
+        bool IgnoreBlankLines = true,
+        string? IgnoreLinePattern = null
+    );
+
+    static (int FileCount, int LineCount) CountLinesOfCode(LocParams p)
+    {
+        var ignoreDirs =
+            p.RootPath.GlobDirectories(ParseGlobs(p.ExcludeDirs)).ToFrozenSet();
+
+        var files =
+            p.RootPath
+                .GlobFiles(ParseGlobs(p.InclusionGlob))
+                .Except(p.RootPath.GlobFiles(ParseGlobs(p.ExclusionGlob)))
+                .Where(p => ignoreDirs.All(d => !d.Contains(p)))
+                .ToArray();
+
+        var totalLines =
+            files
+                .SelectMany(f => f.ReadAllLines())
+                .Select(l => l.Trim())
+                .Count(l =>
+                {
+                    if (p.IgnoreBlankLines && string.IsNullOrWhiteSpace(l))
+                        return false;
+
+                    if (string.IsNullOrWhiteSpace(p.IgnoreLinePattern))
+                        return true;
+
+                    return !Regex.IsMatch(l, p.IgnoreLinePattern, RegexOptions.IgnoreCase);
+                });
+
+        return (files.Length, totalLines);
+
+        static string[] ParseGlobs(string? globs) =>
+            string.IsNullOrWhiteSpace(globs)
+                ? []
+                : globs
+                    .Split(',', StringSplitOptions.TrimEntries | StringSplitOptions.RemoveEmptyEntries)
+                    .Select(x => x.StartsWith('/')
+                                 || x.StartsWith(".//")
+                                 || x.StartsWith('\\') || x.StartsWith(".\\")
+                        ? $"{x.TrimStart('\\').TrimStart('/')}"
+                        : $"**/{x}"
+                    )
+                    .ToArray();
     }
 
     record TestSummary(int Passed, int Failed, int Skipped)
