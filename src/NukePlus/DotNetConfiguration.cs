@@ -12,11 +12,14 @@ public class DotNetConfiguration : Enumeration
     public static implicit operator string(DotNetConfiguration configuration) => configuration.Value;
 }
 
+[Serializable]
 public record Sdk(string Version, string RollForward);
 
+[Serializable]
 public record GlobalJson(Sdk Sdk);
 
 [PublicAPI, UsedImplicitly(ImplicitUseKindFlags.Assign)]
+[AttributeUsage(AttributeTargets.Property | AttributeTargets.Field)]
 public class GlobalJsonAttribute : ParameterAttribute
 {
     readonly AbsolutePath filePath;
