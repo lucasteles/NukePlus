@@ -107,7 +107,9 @@ public static class NukePlusTasks
                 }
                 catch (Exception e)
                 {
+#pragma warning disable S6667
                     Log.Warning("Tool Update: {Message}", e.Message);
+#pragma warning restore S6667
                 }
             });
 
